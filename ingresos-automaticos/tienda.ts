@@ -1,0 +1,53 @@
+// Tienda de un producto digital: Stripe cobra y el servidor entrega la descarga.
+// Funciona 24/7 sin intervención: tú solo creas el producto y traes visitas.
+const stripeKey = Bun.env.STRIPE_SECRET_KEY
+const priceID = Bun.env.STRIPE_PRICE_ID
+const baseURL = Bun.env.BASE_URL ?? "http://localhost:3000"
+const producto = Bun.file(Bun.env.PRODUCTO ?? "./productos/producto.pdf")
+
+if (!stripeKey || !priceID) throw new Error("Faltan STRIPE_SECRET_KEY o STRIPE_PRICE_ID en .env")
+
+Bun.serve({
+  port: Number(Bun.env.PORT ?? 3000),
+  routes: {
+    "/": () => new Response(Bun.file("./landing.html")),
+    "/comprar": { POST: crearPago },
+    "/gracias": entregar,
+  },
+})
+
+console.log(`Tienda abierta en ${baseURL}`)
+
+async function crearPago() {
+  const res = await stripe("/checkout/sessions", {
+    mode: "payment",
+    "line_items[0][price]": priceID!,
+    "line_items[0][quantity]": "1",
+    success_url: `${baseURL}/gracias?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: baseURL,
+    "invoice_creation[enabled]": "true", // Stripe envía factura al cliente
+  })
+  return Response.redirect(res.url, 303)
+}
+
+// Solo entrega el archivo si Stripe confirma que esa sesión está pagada.
+async function entregar(req: Request) {
+  const id = new URL(req.url).searchParams.get("session_id")
+  if (!id?.startsWith("cs_")) return new Response("Enlace no válido", { status: 400 })
+  const sesion = await stripe(`/checkout/sessions/${id}`)
+  if (sesion.payment_status !== "paid") return new Response("Pago no completado", { status: 402 })
+  return new Response(producto, {
+    headers: { "Content-Disposition": `attachment; filename="${producto.name?.split("/").pop()}"` },
+  })
+}
+
+async function stripe(path: string, form?: Record<string, string>) {
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    method: form ? "POST" : "GET",
+    headers: { Authorization: `Bearer ${stripeKey}` },
+    body: form ? new URLSearchParams(form) : undefined,
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error?.message ?? "Error de Stripe")
+  return json
+}
