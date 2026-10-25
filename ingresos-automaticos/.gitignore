@@ -1,3 +1,4 @@
 .env
 productos/*
 !productos/.gitkeep
+descargas.sqlite*
