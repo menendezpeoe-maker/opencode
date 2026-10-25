@@ -17,7 +17,15 @@ Regla: un problema concreto para un público concreto. Precio 9–29 €.
 3. `cp .env.example .env` y rellénalo (empieza con claves `sk_test_`).
 4. Pon tu archivo en `productos/producto.pdf` y edita `landing.html`.
 5. `bun tienda.ts` y abre http://localhost:3000. Prueba con la tarjeta `4242 4242 4242 4242`.
-6. Publícalo en un servidor barato (Railway, Fly.io o un VPS de ~5 €/mes) y cambia a claves `sk_live_`.
+6. `bun test` comprueba que los enlaces de descarga caducan.
+7. Publícalo en un servidor barato (Railway, Fly.io o un VPS de ~5 €/mes) y cambia a claves `sk_live_`.
+
+## Enlaces de descarga que caducan
+Tras pagar, el comprador llega a `/gracias?session_id=...` y descarga el archivo. Ese enlace deja de funcionar:
+- a las `HORAS_DESCARGA` horas (24 por defecto) desde que se creó el pago en Stripe, y
+- tras `MAX_DESCARGAS` descargas (3 por defecto; pon `1` para un solo uso).
+
+Las descargas se apuntan en `descargas.sqlite`. Si tu servidor borra el disco al reiniciar (p. ej. Railway sin volumen), monta un volumen y apunta `REGISTRO_DESCARGAS` ahí, o el contador se reinicia (el límite de horas sigue funcionando porque lo da Stripe).
 
 ## Lo que de verdad trae ventas: las visitas
 El código es el 10 %. El 90 % es que la gente encuentre tu página:
